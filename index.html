@@ -13,6 +13,7 @@
         border-radius: 5px;
         padding: 10px;
         margin: 10px 0;
+        flex-grow: 1;
     }
 
     /* Darker chat container */
@@ -78,20 +79,24 @@
 
     <hr>
 
-    <h2>Video:</h2>
-    <div>
-        <video style="width: 100%;" id="video-element" controls></video>
-    </div>
+    <div style="display: flex; gap: 4rem;">
+        <div style="flex-grow: 1;">
+            <h2>Video:</h2>
+            <div>
+                <video style="width: 100%;" id="video-element" controls></video>
+            </div>
+        </div>
 
-    <hr>
-
-    <h2>Chat:</h2>
-    <form id="message-form">
-        <input type="text" id="message-input">
-        <button id="send-message" type="submit">Send</button>
-    </form>
-    <div>
-        <ul id="messages-container"></ul>
+        <div style="display: flex; flex-direction: column;">
+            <h2>Chat:</h2>
+            <form id="message-form">
+                <input type="text" id="message-input">
+                <button id="send-message" type="submit">Send</button>
+            </form>
+            <div>
+                <ul id="messages-container"></ul>
+            </div>
+        </div>
     </div>
 
     <hr>
@@ -179,7 +184,7 @@
                 RECEIVED_SEEK_EVENT = true;
             }
 
-            if (event === 'video-set-receive') {
+            if (event === ' ') {
                 const { videoUrl } = args[0];
 
                 CURRENT_VIDEO_URL = videoUrl;
@@ -259,6 +264,7 @@
         if (messageInput === "") return;
 
         messageSendSocket(messageInput.value);
+        messageInput.value = "";
     })
 
     // TODO: Make this work
@@ -303,7 +309,7 @@
         img.src = user.avatar_url;
         p.textContent = message;
 
-        container.replaceChildren(img, p, p, span);
+        container.replaceChildren(img, pUsername, p, span);
         messagesContainer.appendChild(container);
     }
 
@@ -321,6 +327,7 @@
         source.src = CURRENT_VIDEO_URL;
         videoElement.replaceChildren([]);
         videoElement.appendChild(source);
+        debounce(videoElement.load(), 500);
     }
 
     function updateVideoTime() {

@@ -75,7 +75,7 @@ io.on('connection', (socket) => {
         socket.join(ROOMS.party_messages(party.id));
 
         console.log({ event: 'join-party' });
-        console.log({ user: socket.user, partyId: payload.partyId });
+        console.log({ partyId: payload.partyId });
 
         io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId] });
 
