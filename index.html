@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Socket.IO</title>
+</head>
+
+<body>
+    <h1 id="current-party-status">Current Party: No Party</h1>
+
+    <input type="text" id="party-input">
+    <button id="join-party-button">Join party</button>
+
+    <input type="text" id="message-input">
+    <button id="send-message">Send</button>
+
+
+    <input type="text" id="video-input">
+    <button id="send-video">Set Video</button>
+
+    <input type="text" id="time-input">
+    <button id="send-time">Set Time</button>
+
+    <button id="start-button">Start</button>
+    <button id="stop-button">Stop</button>
+
+    <hr>
+
+    <div>
+        <video style="width: 300px;" id="video-element" controls></video>
+    </div>
+
+    <hr>
+
+    <div>
+        <ul id="messages-container"></ul>
+    </div>
+
+    <hr>
+
+    <p id="exception-status"></p>
+</body>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    function debounce(func, timeout = 300) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => { func.apply(this, args); }, timeout);
+        };
+    }
+
+    const videoElement = document.getElementById('video-element');
+    const joinPartyButton = document.getElementById('join-party-button');
+    const messageSendButton = document.getElementById('send-message');
+    const videoSendButton = document.getElementById('send-video');
+    const timeSendButton = document.getElementById('send-time');
+    const messagesContainer = document.getElementById('messages-container');
+    const currentPartyStatus = document.getElementById('current-party-status');
+    const exceptionMessage = document.getElementById('exception-status');
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+
+    let CURRENT_PARTY_ID = null;
+    let CURRENT_VIDEO_URL = null;
+    let CURRENT_VIDEO_TIMER = null;
+    let IS_VIDEO_PAUSED = true;
+
+    const socket = io('http://172.20.10.6:3000', {
+        auth: {
+            token: "30|Htnx5MIbSzx7SVTxxFMgbUaMvmD4pxoQ1VdgLwyx63681a88"
+        }
+    });
+
+
+    socket.onAny((event, ...args) => {
+        if (/parties\.\d+\.stream/.test(event)) {
+            const data = args[0];
+            console.log(`got event: ${event}`, { data });
+        }
+
+        if (event === 'message-receive') {
+            const { partyId, message } = args[0];
+
+            addMessageElement(message);
+        }
+
+        if (event === 'party-joined') {
+            const { partyId } = args[0];
+
+            CURRENT_PARTY_ID = partyId;
+            updateCurrentPartyElement();
+            clearMessagesElement();
+        }
+
+        if (event === 'video-seek-receive') {
+            const { time } = args[0];
+
+            CURRENT_VIDEO_TIMER = time;
+            updateVideoTime();
+        }
+
+        if (event === 'video-set-receive') {
+            const { videoUrl } = args[0];
+
+            CURRENT_VIDEO_URL = videoUrl;
+            updateVideoElement();
+            CURRENT_VIDEO_TIMER = 0;
+            updateVideoTime();
+        }
+
+        if (event === 'video-pause-receive') {
+            IS_VIDEO_PAUSED = true;
+
+            updateVideoPauseState();
+        }
+
+        if (event === 'video-resume-receive') {
+            IS_VIDEO_PAUSED = false;
+
+            updateVideoPauseState();
+        }
+
+        if (event === 'exception') {
+            const { message } = args[0];
+            setException(message);
+        } else {
+            setException('');
+        }
+
+    });
+
+    messageSendButton.addEventListener('click', () => {
+        messageInput = document.getElementById('message-input');
+
+        socket.emit('message-send', { partyId: CURRENT_PARTY_ID, message: messageInput.value });
+    });
+
+    joinPartyButton.addEventListener('click', () => {
+        const partyInput = document.getElementById('party-input');
+
+        socket.emit('join-party', { partyId: parseInt(partyInput.value) });
+    });
+
+    videoSendButton.addEventListener('click', () => {
+        const videoInput = document.getElementById('video-input');
+
+        socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'set_video', videoId: 1 });
+    })
+
+    timeSendButton.addEventListener('click', () => {
+        const timeInput = document.getElementById('time-input');
+
+        seekVideoSocket(parseInt(timeInput.value));
+    });
+
+    startButton.addEventListener('click', () => {
+        resumeVideoSocket();
+    });
+
+    stopButton.addEventListener('click', () => {
+        pauseVideoSocket();
+    });
+
+    videoElement.addEventListener('play', () => {
+        resumeVideoSocket();
+    })
+
+    videoElement.addEventListener('pause', () => {
+        pauseVideoSocket();
+    })
+
+    // TODO: Make this work
+    // videoElement.addEventListener('seeked', () => {
+    //     debounce(seekVideoSocket(videoElement.currentTime), 500);
+    // });
+
+    function pauseVideoSocket() {
+        socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'pause' });
+    }
+
+    function resumeVideoSocket() {
+        socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'resume' });
+    }
+
+    function seekVideoSocket(time) {
+        socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'seek', time });
+    }
+
+    function updateCurrentPartyElement() {
+        currentPartyStatus.textContent = `Current Party: ${CURRENT_PARTY_ID}`;
+    }
+
+    function addMessageElement(message) {
+        const node = document.createElement('li');
+        node.textContent = message;
+        messagesContainer.appendChild(node);
+    }
+
+    function clearMessagesElement() {
+        messagesContainer.replaceChildren([]);
+    }
+
+    function setException(message) {
+        exceptionMessage.textContent = message;
+    }
+
+    function updateVideoElement() {
+        const source = document.createElement('source');
+
+        source.src = CURRENT_VIDEO_URL;
+        videoElement.replaceChildren([]);
+        videoElement.appendChild(source);
+    }
+
+    function updateVideoTime() {
+        videoElement.currentTime = CURRENT_VIDEO_TIMER;
+    }
+
+    function updateVideoPauseState() {
+        if (IS_VIDEO_PAUSED) {
+            videoElement.pause();
+        } else {
+            videoElement.play();
+        }
+    }
+
+</script>
+
+</html>
