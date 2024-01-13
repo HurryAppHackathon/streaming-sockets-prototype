@@ -61,6 +61,8 @@
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
 
+    let RECEIVED_SEEK_EVENT = false;
+
     let CURRENT_PARTY_ID = null;
     let CURRENT_VIDEO_URL = null;
     let CURRENT_VIDEO_TIMER = null;
@@ -98,6 +100,7 @@
 
             CURRENT_VIDEO_TIMER = time;
             updateVideoTime();
+            RECEIVED_SEEK_EVENT = true;
         }
 
         if (event === 'video-set-receive') {
@@ -171,9 +174,12 @@
     })
 
     // TODO: Make this work
-    // videoElement.addEventListener('seeked', () => {
-    //     debounce(seekVideoSocket(videoElement.currentTime), 500);
-    // });
+    videoElement.addEventListener('seeked', () => {
+        if (!RECEIVED_SEEK_EVENT) {
+            debounce(seekVideoSocket(videoElement.currentTime), 500);
+        }
+        RECEIVED_SEEK_EVENT = false
+    });
 
     function pauseVideoSocket() {
         socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'pause' });

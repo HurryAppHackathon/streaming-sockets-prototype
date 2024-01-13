@@ -80,7 +80,7 @@ io.on('connection', (socket) => {
             return socket.emit('exception', { message: ERRORS['party_not_found'] });
         }
 
-        return io.to(ROOMS.party_messages(payload.partyId)).emit('message-receive', { partyId: payload?.partyId, message: payload?.message });
+        return io.in(ROOMS.party_messages(payload.partyId)).emit('message-receive', { partyId: payload?.partyId, message: payload?.message });
     }));
 
     socket.on('video-manage-send', (async (payload) => {
@@ -90,11 +90,11 @@ io.on('connection', (socket) => {
 
         switch (payload.action) {
             case 'pause':
-                return io.to(ROOMS.party_stream(payload.partyId)).emit('video-pause-receive', { partyId: payload?.partyId, action: 'pause' });
+                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-pause-receive', { partyId: payload?.partyId, action: 'pause' });
             case 'resume':
-                return io.to(ROOMS.party_stream(payload.partyId)).emit('video-resume-receive', { partyId: payload?.partyId, action: 'resume' });
+                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-resume-receive', { partyId: payload?.partyId, action: 'resume' });
             case 'seek':
-                return io.to(ROOMS.party_stream(payload.partyId)).emit('video-seek-receive', { partyId: payload?.partyId, action: 'seek', time: payload?.time });
+                return io.in(ROOMS.party_stream(payload.partyId)).except(socket.id).emit('video-seek-receive', { partyId: payload?.partyId, action: 'seek', time: payload?.time });
             case 'set_video':
                 res = null;
 
@@ -106,7 +106,7 @@ io.on('connection', (socket) => {
 
                 const videoUrl = res.data.data.url;
 
-                return io.to(ROOMS.party_stream(payload.partyId)).emit('video-set-receive', { partyId: payload?.partyId, action: 'set_video', videoUrl });
+                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-set-receive', { partyId: payload?.partyId, action: 'set_video', videoUrl });
             default:
                 return socket.emit('exception', { message: ERRORS['invalid_action'] });
         }
