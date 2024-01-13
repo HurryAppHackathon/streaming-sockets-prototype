@@ -10,6 +10,10 @@ const server = http.createServer(app);
 const { Server } = require("socket.io");
 const io = new Server(server, { cors: '*' });
 
+const VIDEOS_CACHE = {
+    // PARTY_ID:VIDEO_URL
+};
+
 /**
  * Authenticates a user socket connection
  */
@@ -34,7 +38,10 @@ io.use(async (socket, next) => {
 io.on('connection', (socket) => {
     console.log({ username: socket.user.username });
 
+    socket.emit('user', { user: socket.user });
+
     socket.on('join-party', async (payload) => {
+        payload.partyId = parseInt(payload.partyId);
         if (!payload || typeof payload.partyId !== 'number') {
             return socket.emit('exception', { message: ERRORS['invalid_payload'] });
         }
@@ -68,9 +75,9 @@ io.on('connection', (socket) => {
         socket.join(ROOMS.party_messages(party.id));
 
         console.log({ event: 'join-party' });
-        console.log({ partyId: payload.partyId });
+        console.log({ user: socket.user, partyId: payload.partyId });
 
-        io.to(socket.id).emit('party-joined', { partyId: payload.partyId });
+        io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId] });
 
         return;
     });
@@ -80,7 +87,7 @@ io.on('connection', (socket) => {
             return socket.emit('exception', { message: ERRORS['party_not_found'] });
         }
 
-        return io.in(ROOMS.party_messages(payload.partyId)).emit('message-receive', { partyId: payload?.partyId, message: payload?.message });
+        return io.in(ROOMS.party_messages(payload.partyId)).emit('message-receive', { partyId: payload?.partyId, user: socket.user, message: payload?.message });
     }));
 
     socket.on('video-manage-send', (async (payload) => {
@@ -105,6 +112,10 @@ io.on('connection', (socket) => {
                 }
 
                 const videoUrl = res.data.data.url;
+
+                VIDEOS_CACHE[payload?.partyId] = videoUrl;
+
+                console.log({ VIDEOS_CACHE })
 
                 return io.in(ROOMS.party_stream(payload.partyId)).emit('video-set-receive', { partyId: payload?.partyId, action: 'set_video', videoUrl });
             default:

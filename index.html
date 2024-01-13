@@ -2,20 +2,72 @@
 <html>
 
 <head>
-    <title>Socket.IO</title>
+    <title>TDV</title>
 </head>
 
+<style>
+    /* Chat containers */
+    .container {
+        border: 2px solid #dedede;
+        background-color: #f1f1f1;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    /* Darker chat container */
+    .darker {
+        border-color: #ccc;
+        background-color: #ddd;
+    }
+
+    /* Clear floats */
+    .container::after {
+        content: "";
+        clear: both;
+        display: table;
+    }
+
+    /* Style images */
+    .container img {
+        float: left;
+        max-width: 60px;
+        width: 100%;
+        margin-right: 20px;
+        border-radius: 50%;
+    }
+
+    /* Style the right image */
+    .container img.right {
+        float: right;
+        margin-left: 20px;
+        margin-right: 0;
+    }
+
+    /* Style time text */
+    .time-right {
+        float: right;
+        color: #aaa;
+    }
+
+    /* Style time text */
+    .time-left {
+        float: left;
+        color: #999;
+    }
+</style>
+
 <body>
+    <h1 id="current-user-status">Not Logged In</h1>
     <h1 id="current-party-status">Current Party: No Party</h1>
 
-    <input type="text" id="party-input">
+    <input type="text" id="token-input" value="56|HfxFgoD2Z1jG6KZXD3DKJaLHYz6FYFk2DNTiMjVO77c93496">
+    <button id="set-token-button">Set Token</button>
+
+    <input type="text" id="party-input" value="1">
     <button id="join-party-button">Join party</button>
 
-    <input type="text" id="message-input">
-    <button id="send-message">Send</button>
-
-
-    <input type="text" id="video-input">
+    <input type="text" id="video-input" value="1">
     <button id="send-video">Set Video</button>
 
     <input type="text" id="time-input">
@@ -26,12 +78,18 @@
 
     <hr>
 
+    <h2>Video:</h2>
     <div>
-        <video style="width: 300px;" id="video-element" controls></video>
+        <video style="width: 100%;" id="video-element" controls></video>
     </div>
 
     <hr>
 
+    <h2>Chat:</h2>
+    <form id="message-form">
+        <input type="text" id="message-input">
+        <button id="send-message" type="submit">Send</button>
+    </form>
     <div>
         <ul id="messages-container"></ul>
     </div>
@@ -51,10 +109,13 @@
     }
 
     const videoElement = document.getElementById('video-element');
+    const currentUserStatus = document.getElementById('current-user-status');
+    const setTokenButton = document.getElementById('set-token-button');
     const joinPartyButton = document.getElementById('join-party-button');
     const messageSendButton = document.getElementById('send-message');
     const videoSendButton = document.getElementById('send-video');
     const timeSendButton = document.getElementById('send-time');
+    const messageForm = document.getElementById('message-form');
     const messagesContainer = document.getElementById('messages-container');
     const currentPartyStatus = document.getElementById('current-party-status');
     const exceptionMessage = document.getElementById('exception-status');
@@ -63,80 +124,97 @@
 
     let RECEIVED_SEEK_EVENT = false;
 
+    let CURRENT_TOKEN = null;
+    let CURRENT_USER = null;
     let CURRENT_PARTY_ID = null;
     let CURRENT_VIDEO_URL = null;
     let CURRENT_VIDEO_TIMER = null;
     let IS_VIDEO_PAUSED = true;
 
-    const socket = io('http://172.20.10.6:3000', {
-        auth: {
-            token: "30|Htnx5MIbSzx7SVTxxFMgbUaMvmD4pxoQ1VdgLwyx63681a88"
-        }
-    });
+    let socket = null;
+    defineSocket();
 
+    function defineSocket() {
+        socket = io('http://172.20.10.6:3000', {
+            auth: {
+                token: CURRENT_TOKEN,
+            }
+        });
 
-    socket.onAny((event, ...args) => {
-        if (/parties\.\d+\.stream/.test(event)) {
-            const data = args[0];
-            console.log(`got event: ${event}`, { data });
-        }
+        socket.onAny((event, ...args) => {
+            if (/parties\.\d+\.stream/.test(event)) {
+                const data = args[0];
+                console.log(`got event: ${event}`, { data });
+            }
 
-        if (event === 'message-receive') {
-            const { partyId, message } = args[0];
+            if (event === 'user') {
+                const { user } = args[0];
 
-            addMessageElement(message);
-        }
+                currentUserStatus.textContent = `Welcome ${user.first_name}!`;
+                CURRENT_USER = user;
+            }
 
-        if (event === 'party-joined') {
-            const { partyId } = args[0];
+            if (event === 'message-receive') {
+                const { partyId, message, user } = args[0];
 
-            CURRENT_PARTY_ID = partyId;
-            updateCurrentPartyElement();
-            clearMessagesElement();
-        }
+                addMessageElement(user, message);
+            }
 
-        if (event === 'video-seek-receive') {
-            const { time } = args[0];
+            if (event === 'party-joined') {
+                const { partyId, videoUrl } = args[0];
 
-            CURRENT_VIDEO_TIMER = time;
-            updateVideoTime();
-            RECEIVED_SEEK_EVENT = true;
-        }
+                CURRENT_PARTY_ID = partyId;
+                CURRENT_VIDEO_URL = videoUrl ?? null;
+                console.log({ videoUrl })
+                updateVideoElement();
+                updateCurrentPartyElement();
+                clearMessagesElement();
+            }
 
-        if (event === 'video-set-receive') {
-            const { videoUrl } = args[0];
+            if (event === 'video-seek-receive') {
+                const { time } = args[0];
 
-            CURRENT_VIDEO_URL = videoUrl;
-            updateVideoElement();
-            CURRENT_VIDEO_TIMER = 0;
-            updateVideoTime();
-        }
+                CURRENT_VIDEO_TIMER = time;
+                updateVideoTime();
+                RECEIVED_SEEK_EVENT = true;
+            }
 
-        if (event === 'video-pause-receive') {
-            IS_VIDEO_PAUSED = true;
+            if (event === 'video-set-receive') {
+                const { videoUrl } = args[0];
 
-            updateVideoPauseState();
-        }
+                CURRENT_VIDEO_URL = videoUrl;
+                updateVideoElement();
+                CURRENT_VIDEO_TIMER = 0;
+                updateVideoTime();
+            }
 
-        if (event === 'video-resume-receive') {
-            IS_VIDEO_PAUSED = false;
+            if (event === 'video-pause-receive') {
+                IS_VIDEO_PAUSED = true;
 
-            updateVideoPauseState();
-        }
+                updateVideoPauseState();
+            }
 
-        if (event === 'exception') {
-            const { message } = args[0];
-            setException(message);
-        } else {
-            setException('');
-        }
+            if (event === 'video-resume-receive') {
+                IS_VIDEO_PAUSED = false;
 
-    });
+                updateVideoPauseState();
+            }
 
-    messageSendButton.addEventListener('click', () => {
-        messageInput = document.getElementById('message-input');
+            if (event === 'exception') {
+                const { message } = args[0];
+                setException(message);
+            } else {
+                setException('');
+            }
 
-        socket.emit('message-send', { partyId: CURRENT_PARTY_ID, message: messageInput.value });
+        });
+    }
+
+    setTokenButton.addEventListener('click', () => {
+        tokenInput = document.getElementById('token-input');
+
+        CURRENT_TOKEN = tokenInput.value;
+        defineSocket();
     });
 
     joinPartyButton.addEventListener('click', () => {
@@ -148,7 +226,7 @@
     videoSendButton.addEventListener('click', () => {
         const videoInput = document.getElementById('video-input');
 
-        socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'set_video', videoId: 1 });
+        socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'set_video', videoId: parseInt(videoInput.value) });
     })
 
     timeSendButton.addEventListener('click', () => {
@@ -173,13 +251,27 @@
         pauseVideoSocket();
     })
 
+    messageForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        messageInput = document.getElementById('message-input');
+
+        if (messageInput === "") return;
+
+        messageSendSocket(messageInput.value);
+    })
+
     // TODO: Make this work
     videoElement.addEventListener('seeked', () => {
         if (!RECEIVED_SEEK_EVENT) {
-            debounce(seekVideoSocket(videoElement.currentTime), 500);
+            debounce(seekVideoSocket(videoElement.currentTime), 250);
         }
         RECEIVED_SEEK_EVENT = false
     });
+
+    function messageSendSocket(message) {
+        socket.emit('message-send', { partyId: CURRENT_PARTY_ID, message });
+    }
 
     function pauseVideoSocket() {
         socket.emit('video-manage-send', { partyId: CURRENT_PARTY_ID, action: 'pause' });
@@ -197,10 +289,22 @@
         currentPartyStatus.textContent = `Current Party: ${CURRENT_PARTY_ID}`;
     }
 
-    function addMessageElement(message) {
-        const node = document.createElement('li');
-        node.textContent = message;
-        messagesContainer.appendChild(node);
+    function addMessageElement(user, message) {
+        const container = document.createElement('div');
+        const img = document.createElement('img');
+        const p = document.createElement('p');
+        const pUsername = document.createElement('p');
+        const span = document.createElement('span');
+
+        container.classList.add('container');
+        span.classList.add('time-right');
+
+        pUsername.textContent = user.username;
+        img.src = user.avatar_url;
+        p.textContent = message;
+
+        container.replaceChildren(img, p, p, span);
+        messagesContainer.appendChild(container);
     }
 
     function clearMessagesElement() {
