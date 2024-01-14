@@ -11,7 +11,7 @@ const { Server } = require("socket.io");
 const io = new Server(server, { cors: '*' });
 
 const VIDEOS_CACHE = {
-    // PARTY_ID:VIDEO_URL
+    // PARTY_ID:VIDEO
 };
 
 /**
@@ -77,7 +77,7 @@ io.on('connection', (socket) => {
         console.log({ event: 'join-party' });
         console.log({ partyId: payload.partyId });
 
-        io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId] });
+        io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId]?.url, video: VIDEOS_CACHE[payload?.partyId]  });
 
         return;
     });
@@ -111,13 +111,12 @@ io.on('connection', (socket) => {
                     return socket.emit('exception', { message: ERRORS['invalid_action'] });
                 }
 
+                const video = res.data.data;
                 const videoUrl = res.data.data.url;
 
-                VIDEOS_CACHE[payload?.partyId] = videoUrl;
+                VIDEOS_CACHE[payload?.partyId] = { ...video };
 
-                console.log({ VIDEOS_CACHE })
-
-                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-set-receive', { partyId: payload?.partyId, action: 'set_video', videoUrl });
+                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-set-receive', { partyId: payload?.partyId, action: 'set_video', videoUrl, video });
             default:
                 return socket.emit('exception', { message: ERRORS['invalid_action'] });
         }
