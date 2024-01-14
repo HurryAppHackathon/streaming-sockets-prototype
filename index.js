@@ -92,7 +92,7 @@ io.on('connection', (socket) => {
         }
 
         if (PARTY_MESSAGES[payload?.partyId]) {
-            PARTY_MESSAGES[payload?.partyId].append({ message: payload?.message, user: { ...socket.user } })
+            PARTY_MESSAGES[payload?.partyId].push({ message: payload?.message, user: { ...socket.user } })
         } else {
             PARTY_MESSAGES[payload?.partyId] = [{ message: payload?.message, user: { ...socket.user } }]
         }
