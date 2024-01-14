@@ -83,6 +83,24 @@ io.on('connection', (socket) => {
 
         io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId]?.url, video: VIDEOS_CACHE[payload?.partyId], messages: PARTY_MESSAGES[payload?.partyId] ?? [] });
 
+        res = null;
+
+        try {
+            res = await axios.post(PATHS['addUserToParty'](payload.partyId), { user_id: socket.user.id }, { ...DEFAULT_OPTIONS(socket.token) });
+        } catch (e) {
+            return socket.emit('exception', { message: ERRORS['party_not_found'] });
+        }
+
+        const sockets = io.sockets.adapter.rooms.get(ROOMS.party_stream(payload.partyId));
+
+        sockets.forEach((socketId) => {
+            if (socketId === socket.id) {
+                return;
+            }
+
+            io.to(socketId).emit('user-party-joined', { partyId: payload.partyId, user: socket.user });
+        });
+
         return;
     });
 

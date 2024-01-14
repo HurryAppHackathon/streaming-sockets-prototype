@@ -18,6 +18,7 @@ const PATHS = {
     'currentUser': `${SERVER_URL}/api/v1/auth/@me`,
     'getParty': (partyId) => `${SERVER_URL}/api/v1/parties/${partyId}`,
     'getVideo': (videoId) => `${SERVER_URL}/api/v1/videos/${videoId}`,
+    'addUserToParty': (partyId) => `${SERVER_URL}/api/v1/parties/${partyId}/users`,
 }
 
 const ROOMS = {
