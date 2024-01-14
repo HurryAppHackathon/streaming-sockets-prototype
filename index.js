@@ -105,13 +105,36 @@ io.on('connection', (socket) => {
             return socket.emit('exception', { message: ERRORS['party_not_found'] });
         }
 
+        const sockets = io.sockets.adapter.rooms.get(ROOMS.party_stream(payload.partyId));
+
         switch (payload.action) {
             case 'pause':
-                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-pause-receive', { partyId: payload?.partyId, action: 'pause' });
+                sockets.forEach((socketId) => {
+                    if (socketId === socket.id) {
+                        return;
+                    }
+
+                    io.to(socketId).emit('video-pause-receive', { partyId: payload?.partyId, action: 'pause' });
+                });
+                return
             case 'resume':
-                return io.in(ROOMS.party_stream(payload.partyId)).emit('video-resume-receive', { partyId: payload?.partyId, action: 'resume' });
+                sockets.forEach((socketId) => {
+                    if (socketId === socket.id) {
+                        return;
+                    }
+
+                    io.to(socketId).emit('video-resume-receive', { partyId: payload?.partyId, action: 'resume' });
+                });
+                return
             case 'seek':
-                return io.in(ROOMS.party_stream(payload.partyId)).except(socket.id).emit('video-seek-receive', { partyId: payload?.partyId, action: 'seek', time: payload?.time });
+                sockets.forEach((socketId) => {
+                    if (socketId === socket.id) {
+                        return;
+                    }
+
+                    io.to(socketId).emit('video-seek-receive', { partyId: payload?.partyId, action: 'seek', time: payload?.time });
+                });
+                return;
             case 'set_video':
                 res = null;
 
