@@ -14,6 +14,10 @@ const VIDEOS_CACHE = {
     // PARTY_ID:VIDEO
 };
 
+const PARTY_MESSAGES = {
+    // PARTY_ID:{MESSAGE, USER}
+};
+
 /**
  * Authenticates a user socket connection
  */
@@ -77,7 +81,7 @@ io.on('connection', (socket) => {
         console.log({ event: 'join-party' });
         console.log({ partyId: payload.partyId });
 
-        io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId]?.url, video: VIDEOS_CACHE[payload?.partyId]  });
+        io.to(socket.id).emit('party-joined', { partyId: payload.partyId, videoUrl: VIDEOS_CACHE[payload?.partyId]?.url, video: VIDEOS_CACHE[payload?.partyId], messages: PARTY_MESSAGES[payload?.partyId] ?? [] });
 
         return;
     });
@@ -85,6 +89,12 @@ io.on('connection', (socket) => {
     socket.on('message-send', ((payload) => {
         if (!socket.rooms.has(ROOMS.party_messages(payload?.partyId))) {
             return socket.emit('exception', { message: ERRORS['party_not_found'] });
+        }
+
+        if (PARTY_MESSAGES[payload?.partyId]) {
+            PARTY_MESSAGES[payload?.partyId].append({ message: payload?.message, user: { ...socket.user } })
+        } else {
+            PARTY_MESSAGES[payload?.partyId] = [{ message: payload?.message, user: { ...socket.user } }]
         }
 
         return io.in(ROOMS.party_messages(payload.partyId)).emit('message-receive', { partyId: payload?.partyId, user: socket.user, message: payload?.message });
